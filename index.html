@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scanner Barcode SO</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 520px;
+      margin: auto;
+      padding: 20px;
+      background: #f1f5f9;
+      color: #172033;
+    }
+    .panel {
+      background: white;
+      padding: 18px;
+      border-radius: 14px;
+    }
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      font-size: 15px;
+    }
+    #status { margin-top: 14px; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h2>Scan Barcode Barang</h2>
+    <p>Arahkan kamera belakang ke barcode barang.</p>
+    <div id="reader"></div>
+    <div id="status">Menyiapkan scanner...</div>
+    <button id="btnTutup" onclick="tutupScanner()">TUTUP SCANNER</button>
+  </div>
+
+  <script>
+    let scanner = null;
+    let sudahTerbaca = false;
+
+    async function mulaiScanner() {
+      const status = document.getElementById('status');
+
+      if (!window.opener) {
+        status.textContent =
+          'Halaman dibuka tanpa aplikasi SO. Buka scanner melalui tombol di aplikasi SO.';
+        return;
+      }
+
+      if (!window.Html5Qrcode) {
+        status.textContent = 'Library scanner gagal dimuat. Periksa internet.';
+        return;
+      }
+
+      try {
+        scanner = new Html5Qrcode('reader');
+
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 280, height: 130 },
+            aspectRatio: 1.777,
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.ITF
+            ]
+          },
+          async (teks) => {
+            if (sudahTerbaca) return;
+            sudahTerbaca = true;
+
+            status.textContent = 'Barcode terbaca: ' + teks;
+
+            try {
+              await scanner.stop();
+              scanner.clear();
+            } catch (e) {}
+
+            // Kirim hasil ke aplikasi SO yang membuka scanner.
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({
+                type: 'SO_BARCODE',
+                barcode: String(teks).trim()
+              }, '*');
+
+              status.textContent = 'Barcode dikirim ke aplikasi SO.';
+              setTimeout(() => window.close(), 700);
+            } else {
+              status.textContent = 'Aplikasi SO sudah tidak terbuka.';
+            }
+          },
+          () => {}
+        );
+
+        status.textContent = 'Kamera aktif. Arahkan ke barcode.';
+      } catch (err) {
+        status.textContent =
+          'Kamera gagal dibuka: ' + (err.message || String(err));
+      }
+    }
+
+    async function tutupScanner() {
+      if (scanner) {
+        try { await scanner.stop(); } catch (e) {}
+        try { scanner.clear(); } catch (e) {}
+      }
+      window.close();
+    }
+
+    mulaiScanner();
+  </script>
+</body>
+</html>
